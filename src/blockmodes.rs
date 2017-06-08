@@ -571,8 +571,18 @@ struct CbcEncryptorProcessor<T> {
 
 impl <T: BlockEncryptor> BlockProcessor for CbcEncryptorProcessor<T> {
     fn process_block(&mut self, _: &[u8], out_hist: &[u8], input: &[u8], output: &mut [u8]) {
-        for ((&x, &y), o) in input.iter().zip(out_hist.iter()).zip(self.temp.iter_mut()) {
-            *o = x ^ y;
+        for ((a, b), c) in input.chunks(16).zip(out_hist.chunks(16)).zip(self.temp.chunks_mut(16)) {
+            if a.len() == 16 && b.len() == 16 && c.len() == 16 {
+                let x: &[u64; 2] = unsafe { ::std::mem::transmute(a.as_ptr()) };
+                let y: &[u64; 2] = unsafe { ::std::mem::transmute(b.as_ptr()) };
+                let o: &mut [u64; 2] = unsafe { ::std::mem::transmute(c.as_ptr()) };
+                o[0] = x[0] ^ y[0];
+                o[1] = x[1] ^ y[1];
+            } else {
+                for ((&x, &y), o) in a.iter().zip(b.iter()).zip(c.iter_mut()) {
+                    *o = x ^ y;
+                }
+            }
         }
         self.algo.encrypt_block(&self.temp[..], output);
     }
